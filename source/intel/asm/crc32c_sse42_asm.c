@@ -384,13 +384,13 @@ uint32_t aws_checksums_crc32c_hw(const uint8_t *input, int length, uint32_t prev
 
 
 /*
- * crc32_avx512(): compute the crc32 of the buffer, where the buffer
+ * crc32c_avx512(): compute the crc32c of the buffer, where the buffer
  * length must be at least 256, and a multiple of 64. Based on:
  *
  * "Fast CRC Computation for Generic Polynomials Using PCLMULQDQ Instruction"
  *  V. Gopal, E. Ozturk, et al., 2009, http://intel.ly/2ySEwL0
  */
-static uint32_t crc32_avx512_simd(const unsigned char *buf, ssize_t len, uint32_t crc)
+static uint32_t crc32c_avx512_simd(const unsigned char *buf, ssize_t len, uint32_t crc)
 {
     /*
      * Definitions of the bit-reflected domain constants k1,k2,k3,k4,k5,k6
@@ -568,7 +568,7 @@ static uint32_t crc32_avx512_simd(const unsigned char *buf, ssize_t len, uint32_
     return _mm_extract_epi32(a1, 1);
 }
 
-uint32_t crc32_avx512(const unsigned char *buf, ssize_t len, uint32_t crc)
+uint32_t crc32c_avx512(const unsigned char *buf, ssize_t len, uint32_t crc)
 {
-	return ~crc32_avx512_simd(buf, len, ~crc);
+	return ~crc32c_avx512_simd(buf, len, ~crc);
 }
