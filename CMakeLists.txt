@@ -69,6 +69,7 @@ if (USE_CPU_EXTENSIONS)
         file(GLOB AWS_ARCH_SRC
                 "source/intel/asm/*.c"
             )
+	add_compile_options(-mvpclmulqdq -msse2 -mavx512f -mpclmul -O3)
     endif()
 
     if (MSVC AND AWS_ARCH_ARM64)
