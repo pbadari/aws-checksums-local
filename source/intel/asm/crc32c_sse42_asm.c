@@ -570,5 +570,8 @@ static uint32_t crc32_avx512_simd(const unsigned char *buf, ssize_t len, uint32_
 
 uint32_t crc32_avx512(const unsigned char *buf, ssize_t len, uint32_t crc)
 {
-	return ~crc32_avx512_simd(buf, len, ~crc);
+    if ( buf == NULL)
+        return 0UL;
+
+    return ~crc32_avx512_simd(buf, len, ~crc);
 }
