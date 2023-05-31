@@ -69,6 +69,7 @@ if (USE_CPU_EXTENSIONS)
         file(GLOB AWS_ARCH_SRC
                 "source/intel/asm/*.c"
             )
+        SET_SOURCE_FILES_PROPERTIES(source/intel/asm/crc32c_sse42_asm.c COMPILE_FLAGS -march=native )
     endif()
 
     if (MSVC AND AWS_ARCH_ARM64)
