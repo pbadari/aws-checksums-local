@@ -279,7 +279,9 @@ static inline uint32_t s_crc32c_sse42_clmul_3072(const uint8_t *input, uint32_t 
 }
 
 static bool detection_performed = false;
+static bool detection_performed_avx512 = false;
 static bool detected_clmul = false;
+static bool detected_avx512 = false;
 
 /*
  * Computes the Castagnoli CRC32c (iSCSI) of the specified data buffer using the Intel CRC32Q (64-bit quad word) and
@@ -568,10 +570,32 @@ static uint32_t crc32_avx512_simd(const unsigned char *buf, ssize_t len, uint32_
     return _mm_extract_epi32(a1, 1);
 }
 
-uint32_t crc32_avx512(const unsigned char *buf, ssize_t len, uint32_t crc)
+uint32_t crc32_avx512(const unsigned char *buf, ssize_t len, uint32_t previousCrc32)
 {
-    if ( buf == NULL)
+    if (buf == NULL)
         return 0UL;
 
-    return ~crc32_avx512_simd(buf, len, ~crc);
+    if (AWS_UNLIKELY(!detection_performed)) {
+        detected_clmul = aws_cpu_has_feature(AWS_CPU_FEATURE_CLMUL);
+        /* Simply setting the flag true to skip HW detection next time
+           Not using memory barriers since the worst that can
+           happen is a fallback to the non HW accelerated code. */
+        detection_performed = true;
+    }
+
+    if (AWS_UNLIKELY(!detection_performed_avx512)) {
+        detected_avx512 = aws_cpu_has_feature(AWS_CPU_FEATURE_AVX512);
+        /* Simply setting the flag true to skip HW detection next time
+           Not using memory barriers since the worst that can
+           happen is a fallback to the non HW accelerated code. */
+        detection_performed_avx512 = true;
+    }
+
+    uint32_t crc = ~previousCrc32;
+
+    if (AWS_LIKELY(detected_clmul) && AWS_LIKELY(detected_avx512)) {
+           crc = ~crc32_avx512_simd(buf, len, crc);
+    }
+
+    return crc;
 }
