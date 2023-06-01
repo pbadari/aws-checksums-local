@@ -594,8 +594,31 @@ uint32_t crc32_avx512(const unsigned char *buf, ssize_t len, uint32_t previousCr
     uint32_t crc = ~previousCrc32;
 
     if (AWS_LIKELY(detected_clmul) && AWS_LIKELY(detected_avx512)) {
-           crc = ~crc32_avx512_simd(buf, len, crc);
+        if (AWS_LIKELY(len >= 256)) {
+            ssize_t chunk_size = len & ~63;
+            crc = ~crc32_avx512_simd(buf, len, crc);
+            /* check remaining data */
+            len -= chunk_size;
+            if (!len)
+                return crc;
+            /* Fall into the default crc32 for the remaining data. */
+            buf += chunk_size;
+        }
     }
 
-    return crc;
+    /* Spin through remaining (aligned) 8-byte chunks using the CRC32Q quad word instruction */
+    while (AWS_LIKELY(len >= 8)) {
+        /* Hardcoding %rcx register (i.e. "+c") to allow use of qword instruction */
+        __asm__ __volatile__("loop_8_%=: CRC32Q (%[in]), %%rcx" : [ crc ] "+c"(crc) : [ in ] "r"(buf));
+        buf += 8;
+        len -= 8;
+    }
+
+    /* Finish up with any trailing bytes using the CRC32B single byte instruction one-by-one */
+    while (len-- > 0) {
+        __asm__ __volatile__("loop_trailing_%=: CRC32B (%[in]), %[crc]" : [ crc ] "+c"(crc) : [ in ] "r"(buf));
+        buf++;
+    }
+
+    return ~crc;
 }
