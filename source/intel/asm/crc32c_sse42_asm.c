@@ -564,11 +564,7 @@ uint32_t aws_checksums_crc32c_hw(const uint8_t *input, int length, uint32_t prev
         input++;
     }
 
-#if defined(CRC32_AVX512_PCLMUL)
     return ~crc;
-#elif defined(CRC32_SSE42_PCLMUL)
-    return crc;
-#endif
 }
 uint32_t aws_checksums_crc32_hw(const uint8_t *input, int length, uint32_t previousCrc32) {
     return aws_checksums_crc32_sw(input, length, previousCrc32);
