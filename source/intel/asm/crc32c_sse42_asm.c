@@ -28,7 +28,7 @@
  * "Fast CRC Computation for Generic Polynomials Using PCLMULQDQ Instruction"
  *  V. Gopal, E. Ozturk, et al., 2009, http://intel.ly/2ySEwL0
  */
-static uint32_t crc32_avx512_simd(const unsigned char *buf, ssize_t len, uint32_t crc)
+static uint32_t crc32_avx512_simd(const uint8_t *input, int length, uint32_t crc)
 {
     /*
      * Definitions of the bit-reflected domain constants k1,k2,k3,k4,k5,k6
@@ -60,22 +60,22 @@ static uint32_t crc32_avx512_simd(const unsigned char *buf, ssize_t len, uint32_
     /*
      * There's at least one block of 256.
      */
-    x1 = _mm512_loadu_si512((__m512i *)(buf + 0x00));
-    x2 = _mm512_loadu_si512((__m512i *)(buf + 0x40));
-    x3 = _mm512_loadu_si512((__m512i *)(buf + 0x80));
-    x4 = _mm512_loadu_si512((__m512i *)(buf + 0xC0));
+    x1 = _mm512_loadu_si512((__m512i *)(input + 0x00));
+    x2 = _mm512_loadu_si512((__m512i *)(input + 0x40));
+    x3 = _mm512_loadu_si512((__m512i *)(input + 0x80));
+    x4 = _mm512_loadu_si512((__m512i *)(input + 0xC0));
 
     x1 = _mm512_xor_si512(x1, _mm512_castsi128_si512(_mm_cvtsi32_si128(crc)));
 
     x0 = _mm512_load_si512((__m512i *)k1k2);
 
-    buf += 256;
-    len -= 256;
+    input += 256;
+    length -= 256;
 
     /*
      * Parallel fold blocks of 256, if any.
      */
-    while (len >= 256)
+    while (length >= 256)
     {
         x5 = _mm512_clmulepi64_epi128(x1, x0, 0x00);
         x6 = _mm512_clmulepi64_epi128(x2, x0, 0x00);
@@ -88,10 +88,10 @@ static uint32_t crc32_avx512_simd(const unsigned char *buf, ssize_t len, uint32_
         x3 = _mm512_clmulepi64_epi128(x3, x0, 0x11);
         x4 = _mm512_clmulepi64_epi128(x4, x0, 0x11);
 
-        y5 = _mm512_loadu_si512((__m512i *)(buf + 0x00));
-        y6 = _mm512_loadu_si512((__m512i *)(buf + 0x40));
-        y7 = _mm512_loadu_si512((__m512i *)(buf + 0x80));
-        y8 = _mm512_loadu_si512((__m512i *)(buf + 0xC0));
+        y5 = _mm512_loadu_si512((__m512i *)(input + 0x00));
+        y6 = _mm512_loadu_si512((__m512i *)(input + 0x40));
+        y7 = _mm512_loadu_si512((__m512i *)(input + 0x80));
+        y8 = _mm512_loadu_si512((__m512i *)(input + 0xC0));
 
         x1 = _mm512_xor_si512(x1, x5);
         x2 = _mm512_xor_si512(x2, x6);
@@ -103,8 +103,8 @@ static uint32_t crc32_avx512_simd(const unsigned char *buf, ssize_t len, uint32_
         x3 = _mm512_xor_si512(x3, y7);
         x4 = _mm512_xor_si512(x4, y8);
 
-        buf += 256;
-        len -= 256;
+        input += 256;
+        length -= 256;
     }
 
     /*
@@ -130,17 +130,17 @@ static uint32_t crc32_avx512_simd(const unsigned char *buf, ssize_t len, uint32_
     /*
      * Single fold blocks of 64, if any.
      */
-    while (len >= 64)
+    while (length >= 64)
     {
-        x2 = _mm512_loadu_si512((__m512i *)buf);
+        x2 = _mm512_loadu_si512((__m512i *)input);
 
         x5 = _mm512_clmulepi64_epi128(x1, x0, 0x00);
         x1 = _mm512_clmulepi64_epi128(x1, x0, 0x11);
         x1 = _mm512_xor_si512(x1, x2);
         x1 = _mm512_xor_si512(x1, x5);
 
-        buf += 64;
-        len -= 64;
+        input += 64;
+        length -= 64;
     }
 
     /*
