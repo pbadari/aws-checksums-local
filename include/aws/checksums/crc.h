@@ -27,7 +27,6 @@ AWS_CHECKSUMS_API uint32_t aws_checksums_crc32(const uint8_t *input, int length,
  * to update a running crc in a subsequent call.
  */
 AWS_CHECKSUMS_API uint32_t aws_checksums_crc32c(const uint8_t *input, int length, uint32_t previousCrc32);
-AWS_CHECKSUMS_API uint32_t crc32_avx512(const unsigned char *buf, int len, uint32_t crc);
 
 AWS_EXTERN_C_END
 AWS_POP_SANE_WARNING_LEVEL
