@@ -20,7 +20,6 @@
 #        pragma clang diagnostic ignored "-Wdollar-in-identifier-extension"
 #    endif
 
-#if defined(CRC32_AVX512_PCLMUL)
 /*
  * crc32_avx512(): compute the crc32 of the buffer, where the buffer
  * length must be at least 256, and a multiple of 64. Based on:
@@ -206,7 +205,6 @@ static uint32_t crc32_avx512_simd(const uint8_t *input, int length, uint32_t crc
     return _mm_extract_epi32(a1, 1);
 }
 
-#elif defined(CRC32_SSE42_PCLMUL)
 /*
  * Factored out common inline asm for folding crc0,crc1,crc2 stripes in rcx, r11, r10 using
  * the specified Magic Constants K1 and K2.
@@ -464,10 +462,11 @@ static inline uint32_t s_crc32c_sse42_clmul_3072(const uint8_t *input, uint32_t 
 
     return crc;
 }
-#endif
 
 static bool detection_performed = false;
 static bool detected_clmul = false;
+static bool detected_sse42 = false;
+static bool detected_avx512 = false;
 
 /*
  * Computes the Castagnoli CRC32c (iSCSI) of the specified data buffer using the Intel CRC32Q (64-bit quad word) and
@@ -480,6 +479,8 @@ uint32_t aws_checksums_crc32c_hw(const uint8_t *input, int length, uint32_t prev
 
     if (AWS_UNLIKELY(!detection_performed)) {
         detected_clmul = aws_cpu_has_feature(AWS_CPU_FEATURE_CLMUL);
+        detected_sse42 = aws_cpu_has_feature(AWS_CPU_FEATURE_SSE_4_2);
+        detected_avx512 = aws_cpu_has_feature(AWS_CPU_FEATURE_AVX512);
         /* Simply setting the flag true to skip HW detection next time
            Not using memory barriers since the worst that can
            happen is a fallback to the non HW accelerated code. */
@@ -512,43 +513,41 @@ uint32_t aws_checksums_crc32c_hw(const uint8_t *input, int length, uint32_t prev
         input++;
     }
 
-#if defined(CRC32_AVX512_PCLMUL)
-    if (AWS_LIKELY(detected_clmul)) {
-        if (AWS_LIKELY(length >= 256)) {
-            ssize_t chunk_size = length & ~63;
-            crc = ~crc32_avx512_simd(input, length, crc);
-            /* check remaining data */
-            length -= chunk_size;
-            if (!length)
-                return crc;
-            /* Fall into the default crc32 for the remaining data. */
-            input += chunk_size;
-        }
-    }
-#elif defined(CRC32_SSE42_PCLMUL)
     /* Using likely to keep this code inlined */
     if (AWS_LIKELY(detected_clmul)) {
-
-        while (AWS_LIKELY(length >= 3072)) {
-            /* Compute crc32c on each block, chaining each crc result */
-            crc = s_crc32c_sse42_clmul_3072(input, crc);
-            input += 3072;
-            length -= 3072;
+        if (AWS_LIKELY(detected_avx512)) {
+            if (AWS_LIKELY(length >= 256)) {
+                ssize_t chunk_size = length & ~63;
+                crc = ~crc32_avx512_simd(input, length, crc);
+                /* check remaining data */
+                length -= chunk_size;
+                if (!length)
+                    return crc;
+                /* Fall into the default crc32 for the remaining data. */
+                input += chunk_size;
+            }
         }
-        while (AWS_LIKELY(length >= 1024)) {
-            /* Compute crc32c on each block, chaining each crc result */
-            crc = s_crc32c_sse42_clmul_1024(input, crc);
-            input += 1024;
-            length -= 1024;
-        }
-        while (AWS_LIKELY(length >= 256)) {
-            /* Compute crc32c on each block, chaining each crc result */
-            crc = s_crc32c_sse42_clmul_256(input, crc);
-            input += 256;
-            length -= 256;
+        else if (AWS_LIKELY(detected_sse42)) {
+            while (AWS_LIKELY(length >= 3072)) {
+                /* Compute crc32c on each block, chaining each crc result */
+                crc = s_crc32c_sse42_clmul_3072(input, crc);
+                input += 3072;
+                length -= 3072;
+            }
+            while (AWS_LIKELY(length >= 1024)) {
+                /* Compute crc32c on each block, chaining each crc result */
+                crc = s_crc32c_sse42_clmul_1024(input, crc);
+                input += 1024;
+                length -= 1024;
+            }
+            while (AWS_LIKELY(length >= 256)) {
+                /* Compute crc32c on each block, chaining each crc result */
+                crc = s_crc32c_sse42_clmul_256(input, crc);
+                input += 256;
+                length -= 256;
+            }
         }
     }
-#endif
 
     /* Spin through remaining (aligned) 8-byte chunks using the CRC32Q quad word instruction */
     while (AWS_LIKELY(length >= 8)) {
