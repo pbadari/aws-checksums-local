@@ -66,48 +66,11 @@ if (USE_CPU_EXTENSIONS)
         source_group("Source Files\\intel\\visualc" FILES ${AWS_ARCH_SRC})
 
     elseif(AWS_ARCH_INTEL AND AWS_HAVE_GCC_INLINE_ASM)
-        # Check for SSE 4.2 support
-        include(CheckCSourceCompiles)
-        set(CMAKE_REQUIRED_FLAGS "-msse4.2")
-        check_c_source_runs("
-            #include <nmmintrin.h>
-            int main() {
-                __m128i a = _mm_setzero_si128();
-                return 0;
-            }
-        " SSE42_SUPPORTED)
-
-        if (SSE42_SUPPORTED)
-            add_definitions(-DCRC32_SSE42_PCLMUL)
-            set(AWS_CMAKE_REQUIRED_FLAGS "-msse4.2 -mvpclmulqdq -mpclmul")
-            message(STATUS "SSE 4.2 is supported.")
-        else ()
-            message(STATUS "SSE 4.2 is not supported.")
-        endif ()
-
-        set(CMAKE_REQUIRED_FLAGS "-mavx512f")
-        check_c_source_runs("
-            #include <immintrin.h>
-            int main() {
-                __m512 a = _mm512_setzero_ps();
-                return 0;
-            }
-        " AVX512_SUPPORTED)
-
-        if (AVX512_SUPPORTED)
-            remove_definitions(-DCRC32_SSE42_PCLMUL)
-            add_definitions(-DCRC32_AVX512_PCLMUL)
-            set(AWS_CMAKE_REQUIRED_FLAGS "-mavx512f -mvpclmulqdq -mpclmul")
-            message(STATUS "AVX-512 is supported.")
-        else ()
-            message(STATUS "AVX-512 is not supported.")
-        endif ()
-
+        set(AWS_CMAKE_REQUIRED_FLAGS "-mavx512f -msse4.2 -mvpclmulqdq -mpclmul")
         file(GLOB AWS_ARCH_SRC
                 "source/intel/asm/*.c"
             )
-        SET_SOURCE_FILES_PROPERTIES(source/intel/asm/crc32c_sse42_asm.c
-            COMPILE_FLAGS ${AWS_CMAKE_REQUIRED_FLAGS})
+        SET_SOURCE_FILES_PROPERTIES(source/intel/asm/crc32c_sse42_asm.c COMPILE_FLAGS ${AWS_CMAKE_REQUIRED_FLAGS})
     endif()
 
     if (MSVC AND AWS_ARCH_ARM64)
